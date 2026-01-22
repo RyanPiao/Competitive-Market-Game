@@ -15,27 +15,39 @@
                 <button class="btn-role" onclick="startGame('BUYER')">
                     <div class="icon">🛒</div>
                     <h3>BUYER</h3>
-                    <p>Buy low, sell high value.</p>
+                    <p>Goal: Buy Low</p>
                 </button>
                 <button class="btn-role" onclick="startGame('SELLER')">
                     <div class="icon">🍊</div>
                     <h3>SELLER</h3>
-                    <p>Produce low, sell high.</p>
+                    <p>Goal: Sell High</p>
                 </button>
             </div>
         </div>
     </div>
 
     <div class="game-container" id="game-interface" style="display:none;">
+        
+        <div class="instructions-panel">
+            <h3>📝 How to Play</h3>
+            <p id="instruction-text">Loading instructions...</p>
+        </div>
+
         <div class="header">
             <div class="stats">
-                <h2 id="user-role-display">SELLER</h2>
-                <p><span id="label-unit-val">Unit Cost</span>: <span id="unit-val">$0.00</span></p>
-                <p>Oranges: <span id="inventory">0</span> / 3</p>
-                <p>Earnings: <span id="earnings">$0.00</span></p>
+                <h2 id="user-role-display">LOADING...</h2>
+                <p><span id="label-unit-val">Unit Value</span>: <span id="unit-val">$0.00</span></p>
+                <p>Inventory: <span id="inventory">0</span> / 3</p>
+                <p>Total Earnings: <span id="earnings">$0.00</span></p>
             </div>
-            <div class="chart-area" id="market-log">
-                <p>Market Log...</p>
+            
+            <div class="ticker-area">
+                <h4>Recent Transactions</h4>
+                <div id="transaction-log">
+                    <div class="log-entry header-row">
+                        <span>Price</span><span>ByType</span>
+                    </div>
+                    </div>
             </div>
         </div>
 
@@ -50,12 +62,18 @@
                 <div class="slider-container">
                     <input type="range" id="price-slider" min="0.00" max="3.00" step="0.01" value="1.50">
                     <div class="slider-val">
-                        <span id="action-label">Your Ask</span>: $<span id="slider-display">1.50</span>
+                        <span id="action-label">Your Bid</span>: $<span id="slider-display">1.50</span>
                     </div>
                 </div>
 
                 <div class="buttons">
-                    <button id="btn-primary" class="btn-orange">ASK</button>
+                    <button id="btn-primary" class="btn-orange">SUBMIT ORDER</button>
+                </div>
+                
+                <div class="or-divider">- OR -</div>
+
+                <div class="quick-action">
+                    <button id="btn-quick" class="btn-blue">Accept Best Market Price</button>
                 </div>
             </div>
 
@@ -69,10 +87,6 @@
                     <div id="asks-list" class="list"></div>
                 </div>
             </div>
-        </div>
-        
-        <div class="quick-action">
-             <button id="btn-quick" class="btn-blue">Sell at Highest Bid</button>
         </div>
     </div>
 
