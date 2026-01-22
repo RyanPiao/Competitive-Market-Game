@@ -9,18 +9,26 @@
 
     <div id="role-overlay" class="overlay">
         <div class="card">
-            <h1>Choose Your Role</h1>
-            <p>Market for Oranges</p>
+            <h1>Market for Oranges</h1>
+            
+            <div class="instructions-box">
+                <h3>📖 How to Play</h3>
+                <ul>
+                    <li><strong>Goal:</strong> Buy Low or Sell High to maximize profit.</li>
+                    <li><strong>Buyers:</strong> You have a "Willingness to Pay". Buy for <em>less</em> than this value to earn profit.</li>
+                    <li><strong>Sellers:</strong> You have a "Cost". Sell for <em>more</em> than this cost to earn profit.</li>
+                    <li><strong>Trading:</strong> Use the slider to make an offer, or click "Accept Market Price" to trade instantly.</li>
+                </ul>
+            </div>
+
             <div class="role-buttons">
                 <button class="btn-role" onclick="startGame('BUYER')">
                     <div class="icon">🛒</div>
-                    <h3>BUYER</h3>
-                    <p>Goal: Buy Low</p>
+                    <h3>PLAY AS BUYER</h3>
                 </button>
                 <button class="btn-role" onclick="startGame('SELLER')">
                     <div class="icon">🍊</div>
-                    <h3>SELLER</h3>
-                    <p>Goal: Sell High</p>
+                    <h3>PLAY AS SELLER</h3>
                 </button>
             </div>
         </div>
@@ -28,65 +36,68 @@
 
     <div class="game-container" id="game-interface" style="display:none;">
         
-        <div class="instructions-panel">
-            <h3>📝 How to Play</h3>
-            <p id="instruction-text">Loading instructions...</p>
-        </div>
-
         <div class="header">
-            <div class="stats">
-                <h2 id="user-role-display">LOADING...</h2>
-                <p><span id="label-unit-val">Unit Value</span>: <span id="unit-val">$0.00</span></p>
-                <p>Inventory: <span id="inventory">0</span> / 3</p>
-                <p>Total Earnings: <span id="earnings">$0.00</span></p>
+            <div class="stat-box">
+                <span class="stat-label" id="user-role-display">ROLE</span>
             </div>
-            
-            <div class="ticker-area">
-                <h4>Recent Transactions</h4>
-                <div id="transaction-log">
-                    <div class="log-entry header-row">
-                        <span>Price</span><span>ByType</span>
-                    </div>
-                    </div>
+            <div class="stat-box">
+                <span class="stat-label" id="label-unit-val">Unit Value</span>
+                <span class="stat-value" id="unit-val">$0.00</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Inventory</span>
+                <span class="stat-value"><span id="inventory">0</span> / 3</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Total Earnings</span>
+                <span class="stat-value earnings-text" id="earnings">$0.00</span>
             </div>
         </div>
 
         <div class="dashboard">
-            <div class="controls">
-                <img src="https://emojigraph.org/media/apple/orange_1f34a.png" alt="Orange" class="orange-img">
-                
-                <div class="profit-display">
-                    Potential Profit: <span id="potential-profit">--</span>
+            
+            <div class="panel controls">
+                <div class="orange-display">
+                    <img src="https://emojigraph.org/media/apple/orange_1f34a.png" alt="Orange">
                 </div>
                 
-                <div class="slider-container">
+                <div class="control-group">
+                    <div class="profit-label">Potential Profit: <span id="potential-profit">--</span></div>
+                    
                     <input type="range" id="price-slider" min="0.00" max="3.00" step="0.01" value="1.50">
                     <div class="slider-val">
-                        <span id="action-label">Your Bid</span>: $<span id="slider-display">1.50</span>
+                        <span id="action-label">Your Offer</span>: $<span id="slider-display">1.50</span>
                     </div>
-                </div>
 
-                <div class="buttons">
                     <button id="btn-primary" class="btn-orange">SUBMIT ORDER</button>
-                </div>
-                
-                <div class="or-divider">- OR -</div>
-
-                <div class="quick-action">
+                    
+                    <div class="divider">or</div>
+                    
                     <button id="btn-quick" class="btn-blue">Accept Best Market Price</button>
                 </div>
             </div>
 
-            <div class="order-book">
-                <div class="col">
+            <div class="panel order-book">
+                <div class="book-col">
                     <h3>BIDS (Buyers)</h3>
-                    <div id="bids-list" class="list"></div>
+                    <div id="bids-list" class="list-container"></div>
                 </div>
-                <div class="col">
+                <div class="book-col">
                     <h3>ASKS (Sellers)</h3>
-                    <div id="asks-list" class="list"></div>
+                    <div id="asks-list" class="list-container"></div>
                 </div>
             </div>
+
+            <div class="panel ticker-panel">
+                <h3>Recent Trades</h3>
+                <div class="ticker-header">
+                    <span>Price</span>
+                    <span>Trader</span>
+                </div>
+                <div id="transaction-log" class="ticker-list">
+                    </div>
+            </div>
+
         </div>
     </div>
 
