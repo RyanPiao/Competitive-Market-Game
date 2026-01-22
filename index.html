@@ -2,37 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Orange Market Seller Game</title>
+    <title>Competitive Market Game</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="game-container">
+
+    <div id="role-overlay" class="overlay">
+        <div class="card">
+            <h1>Choose Your Role</h1>
+            <p>Market for Oranges</p>
+            <div class="role-buttons">
+                <button class="btn-role" onclick="startGame('BUYER')">
+                    <div class="icon">🛒</div>
+                    <h3>BUYER</h3>
+                    <p>Buy low, sell high value.</p>
+                </button>
+                <button class="btn-role" onclick="startGame('SELLER')">
+                    <div class="icon">🍊</div>
+                    <h3>SELLER</h3>
+                    <p>Produce low, sell high.</p>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container" id="game-interface" style="display:none;">
         <div class="header">
             <div class="stats">
-                <h2>SELLER</h2>
-                <p>Unit Cost: <span id="unit-cost">$0.00</span></p>
+                <h2 id="user-role-display">SELLER</h2>
+                <p><span id="label-unit-val">Unit Cost</span>: <span id="unit-val">$0.00</span></p>
                 <p>Oranges: <span id="inventory">0</span> / 3</p>
                 <p>Earnings: <span id="earnings">$0.00</span></p>
             </div>
             <div class="chart-area" id="market-log">
-                <p>Market Open...</p>
+                <p>Market Log...</p>
             </div>
         </div>
 
         <div class="dashboard">
             <div class="controls">
                 <img src="https://emojigraph.org/media/apple/orange_1f34a.png" alt="Orange" class="orange-img">
+                
                 <div class="profit-display">
                     Potential Profit: <span id="potential-profit">--</span>
                 </div>
                 
                 <div class="slider-container">
-                    <input type="range" id="price-slider" min="0.50" max="3.00" step="0.01" value="1.50">
-                    <div class="slider-val">Your Ask: $<span id="slider-display">1.50</span></div>
+                    <input type="range" id="price-slider" min="0.00" max="3.00" step="0.01" value="1.50">
+                    <div class="slider-val">
+                        <span id="action-label">Your Ask</span>: $<span id="slider-display">1.50</span>
+                    </div>
                 </div>
 
                 <div class="buttons">
-                    <button id="btn-ask" class="btn-orange">ASK</button>
+                    <button id="btn-primary" class="btn-orange">ASK</button>
                 </div>
             </div>
 
@@ -49,7 +72,7 @@
         </div>
         
         <div class="quick-action">
-             <button id="btn-sell-now" class="btn-blue">Sell at Highest Bid</button>
+             <button id="btn-quick" class="btn-blue">Sell at Highest Bid</button>
         </div>
     </div>
 
