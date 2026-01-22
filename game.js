@@ -1,104 +1,151 @@
-/* * GAME CONFIGURATION 
- * Logic based on Competitive Market Guide 
- */
-
+/* * GAME CONFIGURATION */
 const GAME_STATE = {
     user: {
-        role: 'SELLER',
+        role: null, // Set on start
         units: 3,
-        costs: [0.50, 0.75, 1.00], // Increasing marginal cost [cite: 24]
+        values: [], // If Buyer (Decreasing marginal valuation)
+        costs: [],  // If Seller (Increasing marginal cost)
         currentUnitIndex: 0,
         earnings: 0
     },
     market: {
         bids: [], // Buy orders
         asks: [], // Sell orders
-        history: []
     },
     bots: [],
-    active: true
+    active: false
 };
 
-// Initialize Bots
-function initBots() {
-    // Creating 5 Buyer Bots and 4 Seller Bots (User is the 5th seller)
-    for(let i=0; i<5; i++) {
-        GAME_STATE.bots.push({ 
-            id: `Buyer${i}`, role: 'BUYER', 
-            value: (1.00 + Math.random()).toFixed(2) // Random value between $1.00-$2.00
-        });
-    }
-    for(let i=0; i<4; i++) {
-        GAME_STATE.bots.push({ 
-            id: `Seller${i}`, role: 'SELLER', 
-            cost: (0.50 + Math.random() * 0.5).toFixed(2) // Random cost between $0.50-$1.00
-        });
-    }
-}
-
-/* * UI UPDATES 
- */
-const ui = {
-    cost: document.getElementById('unit-cost'),
+const UI = {
+    overlay: document.getElementById('role-overlay'),
+    gameInterface: document.getElementById('game-interface'),
+    roleDisplay: document.getElementById('user-role-display'),
+    labelUnitVal: document.getElementById('label-unit-val'),
+    unitVal: document.getElementById('unit-val'),
     inventory: document.getElementById('inventory'),
     earnings: document.getElementById('earnings'),
     slider: document.getElementById('price-slider'),
     sliderDisplay: document.getElementById('slider-display'),
+    actionLabel: document.getElementById('action-label'),
     potentialProfit: document.getElementById('potential-profit'),
     bidsList: document.getElementById('bids-list'),
     asksList: document.getElementById('asks-list'),
     marketLog: document.getElementById('market-log'),
-    btnAsk: document.getElementById('btn-ask'),
-    btnSellNow: document.getElementById('btn-sell-now')
+    btnPrimary: document.getElementById('btn-primary'),
+    btnQuick: document.getElementById('btn-quick')
 };
 
-function updateUI() {
-    // User Stats
-    const currentCost = GAME_STATE.user.costs[GAME_STATE.user.currentUnitIndex];
-    ui.cost.textContent = currentCost ? `$${currentCost.toFixed(2)}` : "Done";
-    ui.inventory.textContent = GAME_STATE.user.units - GAME_STATE.user.currentUnitIndex;
-    ui.earnings.textContent = `$${GAME_STATE.user.earnings.toFixed(2)}`;
+/* * START GAME LOGIC */
+function startGame(role) {
+    GAME_STATE.user.role = role;
+    GAME_STATE.active = true;
 
-    // Order Book Visualization
-    // Sort Bids Descending (Highest buy price first)
-    GAME_STATE.market.bids.sort((a, b) => b.price - a.price);
-    // Sort Asks Ascending (Lowest sell price first)
-    GAME_STATE.market.asks.sort((a, b) => a.price - b.price);
-
-    ui.bidsList.innerHTML = GAME_STATE.market.bids.map(b => `<div class='bid-item'>$${b.price.toFixed(2)}</div>`).join('');
-    ui.asksList.innerHTML = GAME_STATE.market.asks.map(a => `<div class='ask-item'>$${a.price.toFixed(2)}</div>`).join('');
-
-    // Controls
-    if (GAME_STATE.user.currentUnitIndex >= 3) {
-        ui.btnAsk.disabled = true;
-        ui.btnSellNow.disabled = true;
-        ui.sliderDisplay.textContent = "All Sold";
+    // CONFIGURATION BASED ON MANUAL 
+    // Buyers: Decreasing Marginal Valuation
+    // Sellers: Increasing Marginal Cost
+    if (role === 'BUYER') {
+        GAME_STATE.user.values = [1.50, 1.25, 1.00]; 
+        setupBots(4, 5); // 4 Buyer Bots (User is 5th), 5 Seller Bots
     } else {
-        const sliderVal = parseFloat(ui.slider.value);
-        ui.sliderDisplay.textContent = sliderVal.toFixed(2);
-        ui.potentialProfit.textContent = `$${(sliderVal - currentCost).toFixed(2)}`;
+        GAME_STATE.user.costs = [0.50, 0.75, 1.00];
+        setupBots(5, 4); // 5 Buyer Bots, 4 Seller Bots (User is 5th)
+    }
+
+    // Hide Overlay, Show Game
+    UI.overlay.style.display = 'none';
+    UI.gameInterface.style.display = 'flex';
+    
+    updateUI();
+    setInterval(runBotLogic, 1000);
+}
+
+function setupBots(numBuyers, numSellers) {
+    for(let i=0; i<numBuyers; i++) {
+        GAME_STATE.bots.push({ 
+            id: `BotBuy${i}`, role: 'BUYER', 
+            value: (1.00 + Math.random()).toFixed(2) 
+        });
+    }
+    for(let i=0; i<numSellers; i++) {
+        GAME_STATE.bots.push({ 
+            id: `BotSell${i}`, role: 'SELLER', 
+            cost: (0.50 + Math.random() * 0.5).toFixed(2) 
+        });
     }
 }
 
-/* * MARKET MECHANICS (Double Auction)
- */
+/* * UI UPDATES */
+function updateUI() {
+    const role = GAME_STATE.user.role;
+    const idx = GAME_STATE.user.currentUnitIndex;
+
+    // 1. Text & Stats
+    UI.roleDisplay.textContent = role;
+    UI.inventory.textContent = GAME_STATE.user.units - idx;
+    UI.earnings.textContent = `$${GAME_STATE.user.earnings.toFixed(2)}`;
+
+    // 2. Logic for Value/Cost Display
+    let currentVal = 0;
+    let isDone = idx >= 3;
+
+    if (role === 'BUYER') {
+        UI.labelUnitVal.textContent = "Unit Value";
+        currentVal = GAME_STATE.user.values[idx];
+        UI.actionLabel.textContent = "Your Bid";
+        UI.btnPrimary.textContent = "SUBMIT BID";
+        UI.btnQuick.textContent = "Buy at Lowest Ask";
+    } else {
+        UI.labelUnitVal.textContent = "Unit Cost";
+        currentVal = GAME_STATE.user.costs[idx];
+        UI.actionLabel.textContent = "Your Ask";
+        UI.btnPrimary.textContent = "SUBMIT ASK";
+        UI.btnQuick.textContent = "Sell at Highest Bid";
+    }
+
+    UI.unitVal.textContent = isDone ? "Done" : `$${currentVal.toFixed(2)}`;
+
+    // 3. Profit Calc
+    if (isDone) {
+        UI.btnPrimary.disabled = true;
+        UI.btnQuick.disabled = true;
+        UI.potentialProfit.textContent = "--";
+    } else {
+        const sliderVal = parseFloat(UI.slider.value);
+        UI.sliderDisplay.textContent = sliderVal.toFixed(2);
+        
+        let profit = 0;
+        if (role === 'BUYER') profit = currentVal - sliderVal; // Value - Price
+        else profit = sliderVal - currentVal;                 // Price - Cost
+        
+        UI.potentialProfit.textContent = `$${profit.toFixed(2)}`;
+        // Color code profit (Green positive, Red negative)
+        UI.potentialProfit.style.color = profit >= 0 ? '#2a9d8f' : '#e76f51';
+    }
+
+    // 4. Order Book
+    GAME_STATE.market.bids.sort((a, b) => b.price - a.price); // High to Low
+    GAME_STATE.market.asks.sort((a, b) => a.price - b.price); // Low to High
+
+    UI.bidsList.innerHTML = GAME_STATE.market.bids.map(b => 
+        `<div class='bid-item'>$${b.price.toFixed(2)}</div>`).join('');
+    UI.asksList.innerHTML = GAME_STATE.market.asks.map(a => 
+        `<div class='ask-item'>$${a.price.toFixed(2)}</div>`).join('');
+}
+
+/* * MARKET MECHANICS */
 function addOrder(type, price, owner) {
     if(!GAME_STATE.active) return;
-    
     const order = { type, price: parseFloat(price), owner, timestamp: Date.now() };
 
-    if (type === 'BID') {
-        GAME_STATE.market.bids.push(order);
-        checkMatch();
-    } else {
-        GAME_STATE.market.asks.push(order);
-        checkMatch();
-    }
+    if (type === 'BID') GAME_STATE.market.bids.push(order);
+    else GAME_STATE.market.asks.push(order);
+
+    checkMatch();
     updateUI();
 }
 
 function checkMatch() {
-    // Match Highest Bid with Lowest Ask [cite: 9]
+    // Sort orders to find match
     GAME_STATE.market.bids.sort((a, b) => b.price - a.price);
     GAME_STATE.market.asks.sort((a, b) => a.price - b.price);
 
@@ -106,6 +153,7 @@ function checkMatch() {
         const bestBid = GAME_STATE.market.bids[0];
         const bestAsk = GAME_STATE.market.asks[0];
 
+        // Match if Bid >= Ask
         if (bestBid.price >= bestAsk.price) {
             executeTrade(bestBid, bestAsk);
         }
@@ -113,106 +161,92 @@ function checkMatch() {
 }
 
 function executeTrade(bid, ask) {
-    // Transaction price is usually the earlier order's price, simplified here to Bid price
-    const price = bid.price; 
+    const price = bid.price; // Simplified: Transaction happens at Bid price
     
     // Log
     const entry = document.createElement('div');
-    entry.textContent = `Transaction at $${price.toFixed(2)}`;
-    ui.marketLog.prepend(entry);
+    entry.textContent = `Transaction: $${price.toFixed(2)}`;
+    UI.marketLog.prepend(entry);
 
     // Remove orders
     GAME_STATE.market.bids.shift();
     GAME_STATE.market.asks.shift();
 
-    // Check if User was involved
-    if (ask.owner === 'USER') {
+    // Check User Involvement [cite: 32]
+    if (bid.owner === 'USER') {
+        const value = GAME_STATE.user.values[GAME_STATE.user.currentUnitIndex];
+        GAME_STATE.user.earnings += (value - price);
+        GAME_STATE.user.currentUnitIndex++;
+    } else if (ask.owner === 'USER') {
         const cost = GAME_STATE.user.costs[GAME_STATE.user.currentUnitIndex];
         GAME_STATE.user.earnings += (price - cost);
         GAME_STATE.user.currentUnitIndex++;
     }
 
-    // Clear user pending orders if they sold
-    if (ask.owner === 'USER') {
-        GAME_STATE.market.asks = GAME_STATE.market.asks.filter(a => a.owner !== 'USER');
-    }
+    // Cleanup: If user transacted, remove their other pending orders
+    if(bid.owner === 'USER') GAME_STATE.market.bids = GAME_STATE.market.bids.filter(b => b.owner !== 'USER');
+    if(ask.owner === 'USER') GAME_STATE.market.asks = GAME_STATE.market.asks.filter(a => a.owner !== 'USER');
 }
 
-/* * BOT AI [cite: 94-98]
- */
+/* * BOT AI [cite: 94-98] */
 function runBotLogic() {
-    GAME_STATE.bots.forEach(bot => {
-        // Random chance to act this tick (simulates reaction time)
-        if (Math.random() > 0.05) return;
+    if(!GAME_STATE.active) return;
 
-        // Current Market State
+    GAME_STATE.bots.forEach(bot => {
+        if (Math.random() > 0.05) return; // Reaction delay
+
         const bestAsk = GAME_STATE.market.asks.length > 0 ? GAME_STATE.market.asks[0].price : null;
         const bestBid = GAME_STATE.market.bids.length > 0 ? GAME_STATE.market.bids[0].price : null;
 
         if (bot.role === 'BUYER') {
-            /* * BUYER STRATEGY [cite: 95, 96]
-             * If best ask < 90% of value, buy. 
-             * Else make bid at 90% of value.
-             */
-            const targetPrice = bot.value * 0.90;
-            
-            // Should I buy now?
-            if (bestAsk && bestAsk <= targetPrice) {
-                 // Simulate clicking "Buy at Lowest Ask"
-                 // Note: In this simplified engine, we just add a matching bid
-                 addOrder('BID', bestAsk, bot.id);
+            const target = bot.value * 0.90;
+            // Strategy: Buy at lowest ask if ask < 90% val, else Bid 90% val
+            if (bestAsk && bestAsk <= target) {
+                addOrder('BID', bestAsk, bot.id);
             } else {
-                // Submit a bid
-                // Only bid if I don't already have a high bid
-                const myActiveBids = GAME_STATE.market.bids.filter(b => b.owner === bot.id);
-                if (myActiveBids.length === 0) {
-                    addOrder('BID', targetPrice, bot.id);
+                if (!GAME_STATE.market.bids.find(b => b.owner === bot.id)) {
+                    addOrder('BID', target, bot.id);
                 }
             }
         } 
-        else if (bot.role === 'SELLER') {
-            /* * SELLER STRATEGY [cite: 97, 98]
-             * If best bid > 110% of cost, sell.
-             * Else make ask at 110% of cost.
-             */
-            const targetPrice = bot.cost * 1.10;
-
-            if (bestBid && bestBid >= targetPrice) {
-                // Sell at highest bid
+        else { // SELLER
+            const target = bot.cost * 1.10;
+            // Strategy: Sell at highest bid if bid > 110% cost, else Ask 110% cost
+            if (bestBid && bestBid >= target) {
                 addOrder('ASK', bestBid, bot.id);
             } else {
-                // Submit an ask
-                const myActiveAsks = GAME_STATE.market.asks.filter(a => a.owner === bot.id);
-                if (myActiveAsks.length === 0) {
-                    addOrder('ASK', targetPrice, bot.id);
+                if (!GAME_STATE.market.asks.find(a => a.owner === bot.id)) {
+                    addOrder('ASK', target, bot.id);
                 }
             }
         }
     });
 }
 
-/* * EVENT LISTENERS 
- */
-ui.slider.addEventListener('input', updateUI);
+/* * CONTROLS */
+UI.slider.addEventListener('input', updateUI);
 
-ui.btnAsk.addEventListener('click', () => {
-    // Remove previous user asks to prevent spamming
-    GAME_STATE.market.asks = GAME_STATE.market.asks.filter(a => a.owner !== 'USER');
-    
-    addOrder('ASK', ui.slider.value, 'USER');
-});
-
-ui.btnSellNow.addEventListener('click', () => {
-    if (GAME_STATE.market.bids.length > 0) {
-        const bestBid = GAME_STATE.market.bids[0]; // Bids are sorted high-to-low
-        addOrder('ASK', bestBid.price, 'USER');
+UI.btnPrimary.addEventListener('click', () => {
+    // Clear previous user orders
+    if (GAME_STATE.user.role === 'BUYER') {
+        GAME_STATE.market.bids = GAME_STATE.market.bids.filter(b => b.owner !== 'USER');
+        addOrder('BID', UI.slider.value, 'USER');
     } else {
-        alert("No buyers available!");
+        GAME_STATE.market.asks = GAME_STATE.market.asks.filter(a => a.owner !== 'USER');
+        addOrder('ASK', UI.slider.value, 'USER');
     }
 });
 
-/* * INIT 
- */
-initBots();
-updateUI();
-setInterval(runBotLogic, 1000); // Bots think every 1 second
+UI.btnQuick.addEventListener('click', () => {
+    if (GAME_STATE.user.role === 'BUYER') {
+        // Buy at Lowest Ask
+        if (GAME_STATE.market.asks.length > 0) {
+            addOrder('BID', GAME_STATE.market.asks[0].price, 'USER');
+        }
+    } else {
+        // Sell at Highest Bid
+        if (GAME_STATE.market.bids.length > 0) {
+            addOrder('ASK', GAME_STATE.market.bids[0].price, 'USER');
+        }
+    }
+});
