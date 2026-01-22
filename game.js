@@ -1,10 +1,10 @@
-/* * GAME CONFIGURATION */
+/* * GAME CONFIGURATION AND STATE */
 const GAME_STATE = {
     user: {
         role: null,
         units: 3,
-        values: [],
-        costs: [],
+        values: [], // For Buyers (Willingness to Pay)
+        costs: [],  // For Sellers (Marginal Cost)
         currentUnitIndex: 0,
         earnings: 0
     },
@@ -16,17 +16,16 @@ const GAME_STATE = {
     active: false
 };
 
-// Global UI Object
+// UI Elements Container
 let UI = {};
 
-/* * INITIALIZATION */
+/* * INITIALIZATION (Wait for DOM) */
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Economic Engine Loaded. Strategies: CS (Buyers) / PS (Firms).");
-    
-    // 1. Grab HTML elements
+    // Connect all HTML Elements
     UI = {
         overlay: document.getElementById('role-overlay'),
         gameInterface: document.getElementById('game-interface'),
+        instructionText: document.getElementById('instruction-text'),
         roleDisplay: document.getElementById('user-role-display'),
         labelUnitVal: document.getElementById('label-unit-val'),
         unitVal: document.getElementById('unit-val'),
@@ -38,70 +37,48 @@ document.addEventListener('DOMContentLoaded', () => {
         potentialProfit: document.getElementById('potential-profit'),
         bidsList: document.getElementById('bids-list'),
         asksList: document.getElementById('asks-list'),
-        marketLog: document.getElementById('market-log'),
+        transactionLog: document.getElementById('transaction-log'),
         btnPrimary: document.getElementById('btn-primary'),
         btnQuick: document.getElementById('btn-quick')
     };
 
-    // 2. Attach Event Listeners (with safety checks)
+    // Attach Listeners
     if(UI.slider) UI.slider.addEventListener('input', updateUI);
-    
-    if(UI.btnPrimary) {
-        UI.btnPrimary.addEventListener('click', () => {
-            const role = GAME_STATE.user.role;
-            const price = parseFloat(UI.slider.value);
-            
-            // Validation: Don't trade if negative surplus (irrational)
-            // But we allow it if user really wants to.
-            
-            if (role === 'BUYER') {
-                // Clear old user bids
-                GAME_STATE.market.bids = GAME_STATE.market.bids.filter(b => b.owner !== 'USER');
-                addOrder('BID', price, 'USER');
-            } else {
-                // Clear old user asks
-                GAME_STATE.market.asks = GAME_STATE.market.asks.filter(a => a.owner !== 'USER');
-                addOrder('ASK', price, 'USER');
-            }
-        });
-    }
-
-    if(UI.btnQuick) {
-        UI.btnQuick.addEventListener('click', () => {
-            if (GAME_STATE.user.role === 'BUYER') {
-                if (GAME_STATE.market.asks.length > 0) {
-                    // Buy at Lowest Ask (Capture CS immediately)
-                    addOrder('BID', GAME_STATE.market.asks[0].price, 'USER');
-                } else {
-                    alert("No sellers available!");
-                }
-            } else {
-                if (GAME_STATE.market.bids.length > 0) {
-                    // Sell at Highest Bid (Capture PS immediately)
-                    addOrder('ASK', GAME_STATE.market.bids[0].price, 'USER');
-                } else {
-                    alert("No buyers available!");
-                }
-            }
-        });
-    }
+    if(UI.btnPrimary) UI.btnPrimary.addEventListener('click', handlePrimaryAction);
+    if(UI.btnQuick) UI.btnQuick.addEventListener('click', handleQuickAction);
 });
 
-/* * START FUNCTION */
+/* * START GAME LOGIC */
 window.startGame = function(role) {
     GAME_STATE.user.role = role;
     GAME_STATE.active = true;
 
-    // CONFIG: User has 3 units.
+    // Set Economic Parameters [cite: 8, 24]
     if (role === 'BUYER') {
-        GAME_STATE.user.values = [1.50, 1.25, 1.00]; // Decreasing WTP
-        setupBots(5, 5); // Balanced market
+        GAME_STATE.user.values = [1.50, 1.25, 1.00]; // Decreasing marginal value
+        setupBots(5, 5); // Balanced Market
+        
+        // [cite: 146, 147, 148] Instructions for Buyer
+        UI.instructionText.innerHTML = `
+            <strong>You are a BUYER.</strong><br>
+            1. Your goal is to buy oranges for <strong>less</strong> than your Unit Value.<br>
+            2. <strong>Profit = Value - Price</strong>.<br>
+            3. Use the slider to submit a <strong>Bid</strong> (offer to buy) OR click "Accept Best Market Price" to buy instantly from a Seller.
+        `;
     } else {
-        GAME_STATE.user.costs = [0.50, 0.75, 1.00];  // Increasing MC
-        setupBots(5, 5);
+        GAME_STATE.user.costs = [0.50, 0.75, 1.00]; // Increasing marginal cost
+        setupBots(5, 5); // Balanced Market
+        
+        // [cite: 149, 150, 151] Instructions for Seller
+        UI.instructionText.innerHTML = `
+            <strong>You are a SELLER.</strong><br>
+            1. Your goal is to sell oranges for <strong>more</strong> than your Unit Cost.<br>
+            2. <strong>Profit = Price - Cost</strong>.<br>
+            3. Use the slider to submit an <strong>Ask</strong> (offer to sell) OR click "Accept Best Market Price" to sell instantly to a Buyer.
+        `;
     }
 
-    // Switch Screens
+    // Show Game Interface
     UI.overlay.style.display = 'none';
     UI.gameInterface.style.display = 'flex';
     
@@ -113,56 +90,86 @@ function setupBots(numBuyers, numSellers) {
     for(let i=0; i<numBuyers; i++) {
         GAME_STATE.bots.push({ 
             id: `BotBuy${i}`, role: 'BUYER', 
-            // Random WTP between $0.80 and $2.00
-            value: (0.80 + Math.random() * 1.20).toFixed(2) 
+            value: (0.80 + Math.random() * 1.20).toFixed(2) // Random Value $0.80-$2.00
         });
     }
     for(let i=0; i<numSellers; i++) {
         GAME_STATE.bots.push({ 
             id: `BotSell${i}`, role: 'SELLER', 
-            // Random MC between $0.40 and $1.50
-            cost: (0.40 + Math.random() * 1.10).toFixed(2) 
+            cost: (0.40 + Math.random() * 1.10).toFixed(2) // Random Cost $0.40-$1.50
         });
     }
 }
 
-/* * UI UPDATES */
+/* * USER ACTIONS */
+function handlePrimaryAction() {
+    const role = GAME_STATE.user.role;
+    const price = parseFloat(UI.slider.value);
+    
+    if (role === 'BUYER') {
+        // Remove existing user bids (prevent spamming order book)
+        GAME_STATE.market.bids = GAME_STATE.market.bids.filter(b => b.owner !== 'USER');
+        addOrder('BID', price, 'USER');
+    } else {
+        // Remove existing user asks
+        GAME_STATE.market.asks = GAME_STATE.market.asks.filter(a => a.owner !== 'USER');
+        addOrder('ASK', price, 'USER');
+    }
+}
+
+function handleQuickAction() {
+    if (GAME_STATE.user.role === 'BUYER') {
+        if (GAME_STATE.market.asks.length > 0) {
+            // [cite: 29] Buyer accepts lowest ask
+            addOrder('BID', GAME_STATE.market.asks[0].price, 'USER');
+        } else {
+            alert("No sellers in the market right now!");
+        }
+    } else {
+        if (GAME_STATE.market.bids.length > 0) {
+            // [cite: 26] Seller accepts highest bid
+            addOrder('ASK', GAME_STATE.market.bids[0].price, 'USER');
+        } else {
+            alert("No buyers in the market right now!");
+        }
+    }
+}
+
+/* * UI UPDATE LOOP */
 function updateUI() {
     if(!GAME_STATE.active) return;
 
     const role = GAME_STATE.user.role;
     const idx = GAME_STATE.user.currentUnitIndex;
 
-    // Display Stats
+    // 1. Text Labels
     UI.roleDisplay.textContent = role;
     UI.inventory.textContent = GAME_STATE.user.units - idx;
     UI.earnings.textContent = `$${GAME_STATE.user.earnings.toFixed(2)}`;
 
-    // Unit Values vs Costs
+    // 2. Unit Values Logic
     let currentVal = 0;
-    let isDone = idx >= 3;
+    let isDone = idx >= 3; // Max 3 units
 
     if (role === 'BUYER') {
-        UI.labelUnitVal.textContent = "Willingness to Pay"; // Economic Term
+        UI.labelUnitVal.textContent = "Willingness to Pay"; 
         currentVal = GAME_STATE.user.values[idx] || 0;
         UI.actionLabel.textContent = "Your Bid";
         UI.btnPrimary.textContent = "SUBMIT BID";
-        UI.btnQuick.textContent = "Buy Now (Best Ask)";
     } else {
-        UI.labelUnitVal.textContent = "Marginal Cost"; // Economic Term
+        UI.labelUnitVal.textContent = "Marginal Cost";
         currentVal = GAME_STATE.user.costs[idx] || 0;
         UI.actionLabel.textContent = "Your Ask";
         UI.btnPrimary.textContent = "SUBMIT ASK";
-        UI.btnQuick.textContent = "Sell Now (Best Bid)";
     }
 
     UI.unitVal.textContent = isDone ? "Done" : `$${currentVal.toFixed(2)}`;
 
-    // Profit / Surplus Monitor
+    // 3. Profit Estimator
     if (isDone) {
         UI.btnPrimary.disabled = true;
         UI.btnQuick.disabled = true;
-        UI.potentialProfit.textContent = "--";
+        UI.potentialProfit.textContent = "Max Units Traded";
     } else {
         UI.btnPrimary.disabled = false;
         UI.btnQuick.disabled = false;
@@ -171,19 +178,17 @@ function updateUI() {
         UI.sliderDisplay.textContent = sliderVal.toFixed(2);
         
         let surplus = 0;
-        if (role === 'BUYER') {
-            surplus = currentVal - sliderVal; // CS = WTP - Price
-        } else {
-            surplus = sliderVal - currentVal; // PS = Price - MC
-        }
+        if (role === 'BUYER') surplus = currentVal - sliderVal;
+        else surplus = sliderVal - currentVal;
         
         UI.potentialProfit.textContent = `$${surplus.toFixed(2)}`;
-        // Green if Positive Surplus (Rational), Red if Negative (Irrational)
         UI.potentialProfit.style.color = surplus >= 0 ? '#2a9d8f' : '#e76f51';
     }
 
-    // Order Book
+    // 4. Order Book Visualization
+    // Sort Bids: Highest to Lowest
     GAME_STATE.market.bids.sort((a, b) => b.price - a.price);
+    // Sort Asks: Lowest to Highest
     GAME_STATE.market.asks.sort((a, b) => a.price - b.price);
 
     UI.bidsList.innerHTML = GAME_STATE.market.bids.map(b => 
@@ -192,7 +197,7 @@ function updateUI() {
         `<div class='ask-item'>$${a.price.toFixed(2)}</div>`).join('');
 }
 
-/* * MARKET MECHANICS (Double Auction) */
+/* * MARKET ENGINE (Double Auction) */
 function addOrder(type, price, owner) {
     if(!GAME_STATE.active) return;
     const order = { type, price: parseFloat(price), owner, timestamp: Date.now() };
@@ -200,12 +205,12 @@ function addOrder(type, price, owner) {
     if (type === 'BID') GAME_STATE.market.bids.push(order);
     else GAME_STATE.market.asks.push(order);
 
-    checkMatch();
+    checkMatch(); // Check if this new order creates a trade
     updateUI();
 }
 
 function checkMatch() {
-    // Sort: Highest Bid vs Lowest Ask
+    // Re-sort to find best match
     GAME_STATE.market.bids.sort((a, b) => b.price - a.price);
     GAME_STATE.market.asks.sort((a, b) => a.price - b.price);
 
@@ -213,7 +218,7 @@ function checkMatch() {
         const bestBid = GAME_STATE.market.bids[0];
         const bestAsk = GAME_STATE.market.asks[0];
 
-        // Trade Condition: Bid >= Ask
+        // [cite: 10, 163] Trade occurs if Bid >= Ask
         if (bestBid.price >= bestAsk.price) {
             executeTrade(bestBid, bestAsk);
         }
@@ -221,120 +226,81 @@ function checkMatch() {
 }
 
 function executeTrade(bid, ask) {
-    // Price Determination: Set at the Bid price (simplified)
+    // Transaction Price Rule: Price is set by the existing order in book
+    // For simplicity here, we use the Bid Price.
     const price = bid.price;
     
-    // Log
+    // [cite: 165] Record Transaction in Ticker
     const entry = document.createElement('div');
-    entry.textContent = `Transaction: $${price.toFixed(2)}`;
-    if(UI.marketLog) UI.marketLog.prepend(entry);
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span>$${price.toFixed(2)}</span><span>${bid.owner === 'USER' || ask.owner === 'USER' ? 'YOU' : 'BOT'}</span>`;
+    UI.transactionLog.prepend(entry);
 
-    // Remove filled orders
+    // Remove orders
     GAME_STATE.market.bids.shift();
     GAME_STATE.market.asks.shift();
 
-    // CALCULATE REALIZED SURPLUS (Earnings)
+    // Process Earnings [cite: 32, 164]
     if (bid.owner === 'USER') {
-        const wtp = GAME_STATE.user.values[GAME_STATE.user.currentUnitIndex];
-        const cs = wtp - price; // Consumer Surplus
-        GAME_STATE.user.earnings += cs;
+        const value = GAME_STATE.user.values[GAME_STATE.user.currentUnitIndex];
+        GAME_STATE.user.earnings += (value - price);
         GAME_STATE.user.currentUnitIndex++;
-        
-        // Remove other pending user bids
+        // Clear user's other bids
         GAME_STATE.market.bids = GAME_STATE.market.bids.filter(b => b.owner !== 'USER');
     } 
     else if (ask.owner === 'USER') {
-        const mc = GAME_STATE.user.costs[GAME_STATE.user.currentUnitIndex];
-        const ps = price - mc; // Producer Surplus
-        GAME_STATE.user.earnings += ps;
+        const cost = GAME_STATE.user.costs[GAME_STATE.user.currentUnitIndex];
+        GAME_STATE.user.earnings += (price - cost);
         GAME_STATE.user.currentUnitIndex++;
-        
-        // Remove other pending user asks
+        // Clear user's other asks
         GAME_STATE.market.asks = GAME_STATE.market.asks.filter(a => a.owner !== 'USER');
     }
 }
 
-/* * ECONOMIC BOT LOGIC 
- * Bots now trade based on Rational Expectations of Surplus (CS/PS)
- */
+/* * BOT INTELLIGENCE (Rational Maximizers) */
 function runBotLogic() {
     if(!GAME_STATE.active) return;
 
     GAME_STATE.bots.forEach(bot => {
-        // Reaction delay (market friction)
-        if (Math.random() > 0.1) return; 
+        if (Math.random() > 0.1) return; // Reaction delay
 
-        // Analyze Market
         const bestAsk = GAME_STATE.market.asks.length > 0 ? GAME_STATE.market.asks[0].price : null;
         const bestBid = GAME_STATE.market.bids.length > 0 ? GAME_STATE.market.bids[0].price : null;
 
-        /* BUYER LOGIC (Maximize Consumer Surplus) */
         if (bot.role === 'BUYER') {
             const wtp = parseFloat(bot.value);
             
-            // 1. Check for immediate CS
+            // 1. Buy Now if profitable [cite: 95]
             if (bestAsk && bestAsk < wtp) {
-                const potentialCS = wtp - bestAsk;
-                // If surplus is decent (> $0.05), TAKE IT
-                if (potentialCS > 0.05) {
+                if ((wtp - bestAsk) > 0.05) {
                     addOrder('BID', bestAsk, bot.id);
                     return;
                 }
             }
-
-            // 2. If no immediate trade, place a competitive BID
-            // Strategy: Bid slightly higher than current best bid, but keep margin for CS
-            // If no bids, bid 50% of WTP to start liquidity
+            // 2. Or Place Bid [cite: 96]
             if (!GAME_STATE.market.bids.find(b => b.owner === bot.id)) {
-                let targetBid = 0;
-                
-                if (bestBid) {
-                    // Beat the best bid by $0.05, but don't exceed WTP
-                    targetBid = Math.min(bestBid + 0.05, wtp - 0.10);
-                } else {
-                    targetBid = wtp * 0.8; // Open conservative
-                }
-
-                // Only bid if it makes rational sense (Positive CS)
-                if (targetBid < wtp) {
-                    addOrder('BID', targetBid.toFixed(2), bot.id);
-                }
+                // Bid slightly above best bid to compete, but below WTP
+                let target = bestBid ? Math.min(bestBid + 0.05, wtp - 0.10) : wtp * 0.8;
+                if (target < wtp) addOrder('BID', target.toFixed(2), bot.id);
             }
         } 
-        
-        /* SELLER LOGIC (Maximize Producer Surplus) */
         else { // SELLER
             const mc = parseFloat(bot.cost);
-
-            // 1. Check for immediate PS
+            
+            // 1. Sell Now if profitable [cite: 97]
             if (bestBid && bestBid > mc) {
-                const potentialPS = bestBid - mc;
-                // If surplus is decent (> $0.05), TAKE IT
-                if (potentialPS > 0.05) {
+                if ((bestBid - mc) > 0.05) {
                     addOrder('ASK', bestBid, bot.id);
                     return;
                 }
             }
-
-            // 2. If no immediate trade, place a competitive ASK
-            // Strategy: Undercut best ask, but keep margin for PS
+            // 2. Or Place Ask [cite: 98]
             if (!GAME_STATE.market.asks.find(a => a.owner === bot.id)) {
-                let targetAsk = 0;
-
-                if (bestAsk) {
-                    // Undercut by $0.05, but don't go below Cost
-                    targetAsk = Math.max(bestAsk - 0.05, mc + 0.10);
-                } else {
-                    targetAsk = mc * 1.2; // Open conservative
-                }
-
-                // Only ask if it makes rational sense (Positive PS)
-                if (targetAsk > mc) {
-                    addOrder('ASK', targetAsk.toFixed(2), bot.id);
-                }
+                // Ask slightly below best ask to compete, but above MC
+                let target = bestAsk ? Math.max(bestAsk - 0.05, mc + 0.10) : mc * 1.2;
+                if (target > mc) addOrder('ASK', target.toFixed(2), bot.id);
             }
         }
     });
-    
     updateUI();
 }
