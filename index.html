@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Orange Market Seller Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="stats">
+                <h2>SELLER</h2>
+                <p>Unit Cost: <span id="unit-cost">$0.00</span></p>
+                <p>Oranges: <span id="inventory">0</span> / 3</p>
+                <p>Earnings: <span id="earnings">$0.00</span></p>
+            </div>
+            <div class="chart-area" id="market-log">
+                <p>Market Open...</p>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="controls">
+                <img src="https://emojigraph.org/media/apple/orange_1f34a.png" alt="Orange" class="orange-img">
+                <div class="profit-display">
+                    Potential Profit: <span id="potential-profit">--</span>
+                </div>
+                
+                <div class="slider-container">
+                    <input type="range" id="price-slider" min="0.50" max="3.00" step="0.01" value="1.50">
+                    <div class="slider-val">Your Ask: $<span id="slider-display">1.50</span></div>
+                </div>
+
+                <div class="buttons">
+                    <button id="btn-ask" class="btn-orange">ASK</button>
+                </div>
+            </div>
+
+            <div class="order-book">
+                <div class="col">
+                    <h3>BIDS (Buyers)</h3>
+                    <div id="bids-list" class="list"></div>
+                </div>
+                <div class="col">
+                    <h3>ASKS (Sellers)</h3>
+                    <div id="asks-list" class="list"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="quick-action">
+             <button id="btn-sell-now" class="btn-blue">Sell at Highest Bid</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
